@@ -42,30 +42,60 @@ const contacts: Contact[] = [
     track: "purple", trackLabel: "Tech", lastTouch: "Feb 28",
     followUp: { label: "✓ Sent", type: "done" },
     status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-green-light",
+    detail: {
+      email: "j.liu@stripe.com", linkedin: "linkedin.com/in/jamesliu",
+      metAt: "Met at MIT FinTech Conference · Feb 15",
+      notes: '"Really interested in growth PM roles. Gave great advice on Stripe culture and interview process."',
+      suggestedAction: "No action needed — follow-up already sent",
+    },
   },
   {
     name: "Priya Nair", role: "Associate", company: "Bain & Co.",
     track: "blue", trackLabel: "Consulting", lastTouch: "Feb 20",
     followUp: { label: "↻ Due Mar 3", type: "pending" },
     status: { label: "Warm", variant: "amber" }, avatarColor: "bg-rt-amber-light",
+    detail: {
+      email: "p.nair@bain.com", linkedin: "linkedin.com/in/priyanair",
+      metAt: "Intro via Sarah Kim · Feb 18",
+      notes: '"Discussed Bain\'s healthcare practice. Offered to review my resume before application deadline."',
+      suggestedAction: "Send follow-up before Mar 3 deadline",
+    },
   },
   {
     name: "Michael Torres", role: "VP Strategy", company: "Sequoia",
     track: "gray", trackLabel: "VC/PE", lastTouch: "Feb 15",
     followUp: { label: "⚠ Overdue", type: "overdue" },
     status: { label: "Cold", variant: "red" }, avatarColor: "bg-rt-gray-200",
+    detail: {
+      email: "m.torres@sequoiacap.com", linkedin: "linkedin.com/in/michaeltorres",
+      metAt: "HBS VC Trek · Feb 5",
+      notes: '"Brief conversation at networking event. Mentioned openness to coffee chats with MBA students."',
+      suggestedAction: "Re-engage — 14 days since last contact",
+    },
   },
   {
     name: "Anna Chen", role: "Associate PM", company: "Google",
     track: "purple", trackLabel: "Tech", lastTouch: "Mar 1",
     followUp: { label: "✓ Sent", type: "done" },
     status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-blue-light",
+    detail: {
+      email: "a.chen@google.com", linkedin: "linkedin.com/in/annachen",
+      metAt: "Google campus visit · Feb 25",
+      notes: '"Shared insights on APM program. Recommended focusing on product sense cases for interviews."',
+      suggestedAction: "No action needed — follow-up already sent",
+    },
   },
   {
     name: "David Park", role: "Principal", company: "BCG",
     track: "blue", trackLabel: "Consulting", lastTouch: "Jan 30",
     followUp: { label: "✓ Sent", type: "done" },
     status: { label: "Inactive", variant: "gray" }, avatarColor: "bg-rt-gray-200", opacity: 0.6,
+    detail: {
+      email: "d.park@bcg.com", linkedin: "linkedin.com/in/davidpark",
+      metAt: "BCG info session · Jan 20",
+      notes: '"Provided referral for Sarah Kim at McKinsey. Mentioned BCG is hiring for summer."',
+      suggestedAction: "Consider re-engaging if BCG pipeline opens",
+    },
   },
 ];
 
@@ -83,7 +113,7 @@ const Networking = () => {
 
   return (
     <>
-      <TopBar title="Networking" actionLabel="+ Add Contact">
+      <TopBar title="People" actionLabel="+ Add Contact">
         <div className="flex gap-1.5 items-center">
           {filterOptions.map((f) => (
             <button
