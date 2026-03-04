@@ -3,6 +3,9 @@ import TopBar from "@/components/TopBar";
 import Tag from "@/components/Tag";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 
 interface Contact {
   name: string;
@@ -105,27 +108,43 @@ const followUpClass = {
   pending: "bg-rt-amber-light text-rt-amber-dark",
 };
 
-const filterOptions = ["All", "Pending Follow-Up", "Consulting"];
-
 const Networking = () => {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(0);
-  const [activeFilter, setActiveFilter] = useState("All");
+  const [followUpFilter, setFollowUpFilter] = useState("all");
+  const [trackFilter, setTrackFilter] = useState("all");
+
+  const filtered = contacts.filter((c) => {
+    if (followUpFilter !== "all" && c.followUp.type !== followUpFilter) return false;
+    if (trackFilter !== "all" && c.track !== trackFilter) return false;
+    return true;
+  });
 
   return (
     <>
       <TopBar title="People" actionLabel="+ Add Contact">
         <div className="flex gap-1.5 items-center">
-          {filterOptions.map((f) => (
-            <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
-              className={`h-6 px-2.5 rounded-md text-[9px] font-medium font-mono transition-colors ${
-                activeFilter === f ? "bg-rt-blue-light text-rt-blue" : "bg-rt-gray-100 text-rt-gray-500"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+          <Select value={followUpFilter} onValueChange={setFollowUpFilter}>
+            <SelectTrigger className="h-6 w-[100px] text-[9px] font-mono border-border bg-rt-gray-100 px-2 rounded-md">
+              <SelectValue placeholder="Follow-Up" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-[10px]">All Follow-Ups</SelectItem>
+              <SelectItem value="done" className="text-[10px]">Sent</SelectItem>
+              <SelectItem value="pending" className="text-[10px]">Due</SelectItem>
+              <SelectItem value="overdue" className="text-[10px]">Overdue</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={trackFilter} onValueChange={setTrackFilter}>
+            <SelectTrigger className="h-6 w-[100px] text-[9px] font-mono border-border bg-rt-gray-100 px-2 rounded-md">
+              <SelectValue placeholder="Track" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all" className="text-[10px]">All Tracks</SelectItem>
+              <SelectItem value="blue" className="text-[10px]">Consulting</SelectItem>
+              <SelectItem value="purple" className="text-[10px]">Tech</SelectItem>
+              <SelectItem value="gray" className="text-[10px]">VC/PE</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </TopBar>
       <div className="flex-1 overflow-auto p-3">
@@ -137,7 +156,7 @@ const Networking = () => {
         </div>
 
         {/* Rows */}
-        {contacts.map((c, i) => {
+        {filtered.map((c, i) => {
           const isExpanded = expandedIdx === i;
           return (
             <div
