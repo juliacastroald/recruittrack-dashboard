@@ -153,4 +153,26 @@ export const initialCompanies: Company[] = [
     lastActivity: "Feb 15",
     contacts: "1 contact",
   },
+  {
+    id: "hermes",
+    name: "Hermes",
+    track: "green",
+    trackLabel: "Fashion/Beauty",
+    stage: { label: "Applied", variant: "blue" },
+    deadline: "Rolling",
+    lastActivity: "Mar 1",
+    contacts: "0 contacts",
+    detail: {
+      timelineItems: [
+        { title: "Application Submitted", sub: "Mar 1 · Via company portal", filled: true, last: true },
+      ],
+      contacts: [],
+      roleDetails: [
+        { label: "Role", value: "Retail Strategy Intern" },
+        { label: "Application Type", value: "Summer Internship" },
+        { label: "Date applied", value: "Mar 1" },
+        { label: "City", value: "New York" },
+      ],
+    },
+  },
 ];

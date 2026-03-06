@@ -82,20 +82,20 @@ type TrackVariant = "blue" | "purple" | "gray" | "green" | "amber" | "red";
 function loadCustomTracks(): string[] {
   try {
     const raw = localStorage.getItem(CUSTOM_TRACKS_STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) return ["Fashion/Beauty"];
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) && parsed.every((x) => typeof x === "string") ? parsed : [];
+    return Array.isArray(parsed) && parsed.every((x) => typeof x === "string") ? parsed : ["Fashion/Beauty"];
   } catch {
-    return [];
+    return ["Fashion/Beauty"];
   }
 }
 
 function loadCustomTrackVariants(): Record<string, TrackVariant> {
   try {
     const raw = localStorage.getItem(CUSTOM_TRACK_VARIANTS_KEY);
-    if (!raw) return {};
+    if (!raw) return { "Fashion/Beauty": "green" };
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return {};
+    if (!parsed || typeof parsed !== "object") return { "Fashion/Beauty": "green" };
     const result: Record<string, TrackVariant> = {};
     const valid: Set<TrackVariant> = new Set(TRACK_VARIANT_PALETTE);
     valid.add("blue");
@@ -106,7 +106,7 @@ function loadCustomTrackVariants(): Record<string, TrackVariant> {
     }
     return result;
   } catch {
-    return {};
+    return { "Fashion/Beauty": "green" };
   }
 }
 
