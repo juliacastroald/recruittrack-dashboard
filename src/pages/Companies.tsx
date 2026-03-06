@@ -1,140 +1,23 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import TopBar from "@/components/TopBar";
 import Tag from "@/components/Tag";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, X, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { format } from "date-fns";
-
-interface Company {
-  id: string;
-  name: string;
-  track: "blue" | "purple" | "gray";
-  trackLabel: string;
-  stage: { label: string; variant: "blue" | "amber" | "gray" | "green" | "red" };
-  deadline: string;
-  deadlineClosed?: boolean;
-  lastActivity: string;
-  contacts: string;
-  opacity?: number;
-  detail?: {
-    timelineItems: Array<{
-      title: string;
-      sub: string;
-      filled: boolean;
-      last?: boolean;
-      note?: { bg: string; text: string; content: string };
-    }>;
-    contacts: Array<{
-      name: string;
-      role: string;
-      tag: { label: string; variant: "amber" | "green" };
-      referral?: string;
-      note?: string;
-    }>;
-    roleDetails: Array<{ label: string; value: string; color?: string }>;
-  };
-}
-
-const initialCompanies: Company[] = [
-  {
-    id: "mckinsey",
-    name: "McKinsey & Company",
-    track: "blue",
-    trackLabel: "Consulting",
-    stage: { label: "1st Round Interview", variant: "amber" },
-    deadline: "Mar 5",
-    deadlineClosed: true,
-    lastActivity: "Mar 2",
-    contacts: "2 contacts",
-    detail: {
-      timelineItems: [
-        {
-          title: "1st Round Interview Scheduled",
-          sub: "Mar 8 · Confirmed",
-          filled: true,
-          note: { bg: "bg-rt-blue-light", text: "text-rt-blue", content: "Prep note: Review case frameworks, MBB structure" },
-        },
-        {
-          title: "Coffee Chat — Sarah Kim",
-          sub: "Feb 22 · 30 min video call",
-          filled: true,
-          note: { bg: "bg-rt-gray-50 border border-border", text: "text-rt-gray-500", content: "Really helpful conversation about the BA role. Said to follow up after submitting application." },
-        },
-        { title: "Application Submitted", sub: "Feb 10 · Via company portal", filled: true },
-        { title: "Added to tracker", sub: "Feb 1", filled: false, last: true },
-      ],
-      contacts: [
-        { name: "Sarah Kim", role: "Senior Associate", tag: { label: "Follow up", variant: "amber" }, referral: "David Park (BCG)", note: "Intro made Feb 10 · Sloan Trek" },
-        { name: "Tom Walsh", role: "Recruiting Coordinator", tag: { label: "Due Mar 3", variant: "amber" }, note: "Direct outreach · No referral" },
-      ],
-      roleDetails: [
-        { label: "Role", value: "Business Analyst Intern" },
-        { label: "Deadline", value: "Mar 5 (closed)", color: "text-rt-amber" },
-        { label: "Interview", value: "Mar 8 2:00 PM" },
-      ],
-    },
-  },
-  {
-    id: "bain",
-    name: "Bain & Company",
-    track: "blue",
-    trackLabel: "Consulting",
-    stage: { label: "Applied", variant: "blue" },
-    deadline: "Mar 8",
-    lastActivity: "Mar 1",
-    contacts: "1 contact",
-  },
-  {
-    id: "bcg",
-    name: "BCG",
-    track: "blue",
-    trackLabel: "Consulting",
-    stage: { label: "Phone Screen", variant: "amber" },
-    deadline: "Mar 12",
-    lastActivity: "Feb 28",
-    contacts: "1 contact",
-  },
-  {
-    id: "stripe",
-    name: "Stripe",
-    track: "purple",
-    trackLabel: "Tech/PM",
-    stage: { label: "Applied", variant: "blue" },
-    deadline: "Mar 15",
-    lastActivity: "Feb 28",
-    contacts: "1 contact",
-  },
-  {
-    id: "google",
-    name: "Google",
-    track: "purple",
-    trackLabel: "Tech/PM",
-    stage: { label: "Networking", variant: "gray" },
-    deadline: "Rolling",
-    lastActivity: "Mar 1",
-    contacts: "1 contact",
-  },
-  {
-    id: "sequoia",
-    name: "Sequoia Capital",
-    track: "gray",
-    trackLabel: "VC/PE",
-    stage: { label: "Networking", variant: "gray" },
-    deadline: "Rolling",
-    lastActivity: "Feb 15",
-    contacts: "1 contact",
-  },
-];
+import { format, parse } from "date-fns";
+import { useContacts } from "@/contexts/ContactsContext";
+import { useQuickNotes } from "@/contexts/QuickNotesContext";
+import { useCompanies } from "@/contexts/CompaniesContext";
+import type { Company } from "@/data/companies";
 
 const trackOptions = [
   { value: "all", label: "All Tracks" },
-  { value: "blue", label: "Consulting" },
-  { value: "purple", label: "Tech/PM" },
-  { value: "gray", label: "VC/PE" },
+  { value: "Consulting", label: "Consulting" },
+  { value: "Tech/PM", label: "Tech/PM" },
+  { value: "VC/PE", label: "VC/PE" },
 ];
 
 const stageOptions = [
@@ -168,7 +51,7 @@ const applicationStageOptions = [
 
 const interviewFormatOptions = ["On-site", "Virtual", "Phone", "Case", "Behavioral", "Other"];
 
-const trackToVariant: Record<string, "blue" | "purple" | "gray"> = {
+const trackToVariant: Record<string, "blue" | "purple" | "gray" | "green" | "amber" | "red"> = {
   Consulting: "blue",
   "Tech/PM": "purple",
   "VC/PE": "gray",
@@ -181,6 +64,51 @@ const trackToLabel: Record<string, string> = {
   "VC/PE": "VC/PE",
   Other: "Other",
 };
+
+const CUSTOM_TRACKS_STORAGE_KEY = "recruittrack-custom-tracks";
+const CUSTOM_TRACK_VARIANTS_KEY = "recruittrack-custom-track-variants";
+
+const TRACK_VARIANT_PALETTE: Array<"blue" | "purple" | "gray" | "green" | "amber" | "red"> = [
+  "green",
+  "amber",
+  "red",
+  "blue",
+  "purple",
+  "gray",
+];
+
+type TrackVariant = "blue" | "purple" | "gray" | "green" | "amber" | "red";
+
+function loadCustomTracks(): string[] {
+  try {
+    const raw = localStorage.getItem(CUSTOM_TRACKS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) && parsed.every((x) => typeof x === "string") ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadCustomTrackVariants(): Record<string, TrackVariant> {
+  try {
+    const raw = localStorage.getItem(CUSTOM_TRACK_VARIANTS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    const result: Record<string, TrackVariant> = {};
+    const valid: Set<TrackVariant> = new Set(TRACK_VARIANT_PALETTE);
+    valid.add("blue");
+    valid.add("purple");
+    valid.add("gray");
+    for (const [k, v] of Object.entries(parsed)) {
+      if (typeof k === "string" && valid.has(v as TrackVariant)) result[k] = v as TrackVariant;
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
 
 const stageToVariant: Record<string, "blue" | "amber" | "gray" | "green" | "red"> = {
   Networking: "gray",
@@ -201,6 +129,7 @@ const labelBase = "text-[10px] font-mono uppercase tracking-wider text-[#6B7280]
 const emptyForm = {
   companyName: "",
   track: "",
+  trackOther: "",
   website: "",
   logo: null as File | null,
   role: "",
@@ -209,6 +138,7 @@ const emptyForm = {
   applicationDeadline: "",
   dateApplied: "",
   applicationLink: "",
+  city: "",
   interviewDate: "",
   interviewFormat: "",
   interviewNotes: "",
@@ -220,21 +150,65 @@ const emptyForm = {
 
 const Companies = () => {
   const navigate = useNavigate();
-  const [companies, setCompanies] = useState<Company[]>(initialCompanies);
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(0);
+  const { contacts } = useContacts();
+  const { quickNotesByCompany, setQuickNotesByCompany } = useQuickNotes();
+  const { companies, setCompanies } = useCompanies();
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [trackFilter, setTrackFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
-  const [quickNotesByCompany, setQuickNotesByCompany] = useState<Record<string, string>>({});
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editingQuickNotesCompanyId, setEditingQuickNotesCompanyId] = useState<string | null>(null);
+  const quickNotesTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [customTracks, setCustomTracks] = useState<string[]>(loadCustomTracks);
+  const [customTrackVariants, setCustomTrackVariants] = useState<Record<string, TrackVariant>>(loadCustomTrackVariants);
+
+  useEffect(() => {
+    localStorage.setItem(CUSTOM_TRACKS_STORAGE_KEY, JSON.stringify(customTracks));
+  }, [customTracks]);
+
+  useEffect(() => {
+    localStorage.setItem(CUSTOM_TRACK_VARIANTS_KEY, JSON.stringify(customTrackVariants));
+  }, [customTrackVariants]);
+
+  useEffect(() => {
+    const used = new Set<TrackVariant>(Object.values(trackToVariant));
+    const assigned = new Set<TrackVariant>(Object.values(customTrackVariants));
+    used.forEach((v) => assigned.add(v));
+    let changed = false;
+    const next: Record<string, TrackVariant> = { ...customTrackVariants };
+    for (const t of customTracks) {
+      if (!next[t]) {
+        const v = TRACK_VARIANT_PALETTE.find((x) => !assigned.has(x)) ?? TRACK_VARIANT_PALETTE[0];
+        next[t] = v;
+        assigned.add(v);
+        changed = true;
+      }
+    }
+    if (changed) setCustomTrackVariants(next);
+  }, [customTracks]);
+
+  const getVariantForTrackLabel = (label: string): TrackVariant =>
+    trackToVariant[label] ?? customTrackVariants[label] ?? "gray";
+
+  const getNextUnusedVariant = (): TrackVariant => {
+    const used = new Set<TrackVariant>(["blue", "purple", "gray"] as const);
+    Object.values(customTrackVariants).forEach((v) => used.add(v));
+    return TRACK_VARIANT_PALETTE.find((v) => !used.has(v)) ?? TRACK_VARIANT_PALETTE[0];
+  };
 
   const filtered = companies.filter((c) => {
-    if (trackFilter !== "all" && c.track !== trackFilter) return false;
+    if (trackFilter !== "all" && c.trackLabel !== trackFilter) return false;
     if (stageFilter !== "all" && c.stage.label !== stageFilter) return false;
     return true;
   });
+
+  const trackFilterOptions = useMemo(
+    () => [...trackOptions, ...customTracks.map((t) => ({ value: t, label: t }))],
+    [customTracks]
+  );
 
   const handleViewFullProfile = (e: React.MouseEvent, companyId: string) => {
     e.stopPropagation();
@@ -250,17 +224,101 @@ const Companies = () => {
     const newErrors: Record<string, string> = {};
     if (!form.companyName.trim()) newErrors.companyName = "This field is required";
     if (!form.track) newErrors.track = "This field is required";
+    if (form.track === "Other" && !form.trackOther.trim()) newErrors.trackOther = "Please specify the industry/track";
     if (!form.stage) newErrors.stage = "This field is required";
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
 
+    const trackLabel =
+      form.track === "Other" ? form.trackOther.trim() : (trackToLabel[form.track] ?? form.track);
+    const trackValue = form.track === "Other" ? trackLabel : form.track;
+    if (form.track === "Other" && trackLabel && !customTracks.includes(trackLabel)) {
+      const standardValues = trackFormOptions.map((o) => o.value);
+      if (!standardValues.includes(trackLabel)) {
+        setCustomTracks((prev) => [...prev, trackLabel].sort());
+      }
+    }
+
+    let trackVariant: TrackVariant = trackToVariant[trackValue] ?? customTrackVariants[trackValue] ?? "gray";
+    if (form.track === "Other" && trackLabel && !(trackLabel in trackToVariant)) {
+      if (!(trackLabel in customTrackVariants)) {
+        const nextV = getNextUnusedVariant();
+        trackVariant = nextV;
+        setCustomTrackVariants((prev) => ({ ...prev, [trackLabel]: nextV }));
+      } else {
+        trackVariant = customTrackVariants[trackLabel];
+      }
+    }
+
     const id = `new-${Date.now()}`;
-    const trackVariant = trackToVariant[form.track] ?? "gray";
-    const trackLabel = trackToLabel[form.track] ?? form.track;
     const stageVariant = stageToVariant[form.stage] ?? "gray";
     const lastActivity = form.dateApplied ? format(new Date(form.dateApplied), "MMM d") : format(new Date(), "MMM d");
     const deadline = form.applicationDeadline ? format(new Date(form.applicationDeadline), "MMM d") : "Rolling";
     const contactCount = form.contactName.trim() ? 1 : 0;
+
+    const roleDetails: Array<{ label: string; value: string; color?: string }> = [];
+    if (form.role.trim()) roleDetails.push({ label: "Role", value: form.role.trim() });
+    if (form.applicationType) {
+      const appTypeLabel = form.applicationType === "Internship" ? "Summer Internship" : form.applicationType === "Full-Time" ? "Full-Time" : form.applicationType;
+      roleDetails.push({ label: "Application Type", value: appTypeLabel });
+    }
+    if (form.applicationDeadline) {
+      const deadlineStr = format(new Date(form.applicationDeadline), "MMM d");
+      roleDetails.push({ label: "Deadline", value: deadlineStr });
+    }
+    if (form.dateApplied) {
+      roleDetails.push({ label: "Date applied", value: format(new Date(form.dateApplied), "MMM d") });
+    }
+    if (form.applicationLink.trim()) roleDetails.push({ label: "Application link", value: form.applicationLink.trim() });
+    if (form.city.trim()) roleDetails.push({ label: "City", value: form.city.trim() });
+    if (form.interviewDate) {
+      const d = format(new Date(form.interviewDate), "MMM d");
+      const withFormat = form.interviewFormat ? `${d} · ${form.interviewFormat}` : d;
+      roleDetails.push({ label: "Interview", value: withFormat });
+    }
+
+    const timelineItems: Array<{ title: string; sub: string; filled: boolean; last?: boolean; note?: { bg: string; text: string; content: string } }> = [];
+    if (form.interviewDate) {
+      const sub = form.interviewFormat
+        ? `${format(new Date(form.interviewDate), "MMM d")} · ${form.interviewFormat}`
+        : format(new Date(form.interviewDate), "MMM d");
+      const title = form.stage && form.stage !== "Applied" && form.stage !== "Networking" ? `${form.stage} Scheduled` : "Interview Scheduled";
+      timelineItems.push({
+        title,
+        sub,
+        filled: true,
+        note: form.interviewNotes.trim()
+          ? { bg: "bg-rt-blue-light", text: "text-rt-blue", content: form.interviewNotes.trim() }
+          : undefined,
+      });
+    }
+    if (form.dateApplied) {
+      const sub = form.applicationLink.trim() ? `${format(new Date(form.dateApplied), "MMM d")} · Via link` : `${format(new Date(form.dateApplied), "MMM d")} · Via company portal`;
+      timelineItems.push({ title: "Application Submitted", sub, filled: true });
+    }
+    timelineItems.sort((a, b) => {
+      const getDate = (s: string) => {
+        const match = s.match(/([A-Za-z]{3}\s+\d+)/);
+        if (!match) return 0;
+        try {
+          return new Date(`${match[1]} ${new Date().getFullYear()}`).getTime();
+        } catch {
+          return 0;
+        }
+      };
+      return getDate(b.sub) - getDate(a.sub);
+    });
+    if (timelineItems.length > 0) timelineItems[timelineItems.length - 1].last = true;
+
+    const detailContacts: Array<{ name: string; role: string; tag: { label: string; variant: "amber" | "green" }; referral?: string; note?: string }> = [];
+    if (form.contactName.trim()) {
+      detailContacts.push({
+        name: form.contactName.trim(),
+        role: form.contactRole.trim() || "—",
+        tag: { label: "Key contact", variant: "amber" },
+        note: form.contactEmail.trim() ? form.contactEmail.trim() : undefined,
+      });
+    }
 
     const newCompany: Company = {
       id,
@@ -271,6 +329,13 @@ const Companies = () => {
       deadline,
       lastActivity,
       contacts: `${contactCount} contact${contactCount !== 1 ? "s" : ""}`,
+      ...((roleDetails.length > 0 || timelineItems.length > 0 || detailContacts.length > 0) && {
+        detail: {
+          timelineItems,
+          contacts: detailContacts,
+          roleDetails,
+        },
+      }),
     };
 
     setCompanies((prev) => [newCompany, ...prev]);
@@ -345,9 +410,21 @@ const Companies = () => {
                           {trackFormOptions.map((o) => (
                             <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                           ))}
+                          {customTracks.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
+                      {form.track === "Other" && (
+                        <Input
+                          value={form.trackOther}
+                          onChange={(e) => setForm({ ...form, trackOther: e.target.value })}
+                          className={`${inputBase} mt-2`}
+                          placeholder="Type industry or track (e.g. Healthcare, Finance)"
+                        />
+                      )}
                       {errors.track && <p className="text-[11px] text-red-500 mt-1">{errors.track}</p>}
+                      {errors.trackOther && <p className="text-[11px] text-red-500 mt-1">{errors.trackOther}</p>}
                     </div>
                     <div>
                       <label className={`${labelBase} block mb-1`}>Company Website</label>
@@ -448,6 +525,15 @@ const Companies = () => {
                         onChange={(e) => setForm({ ...form, applicationLink: e.target.value })}
                         className={inputBase}
                         placeholder="Job posting URL..."
+                      />
+                    </div>
+                    <div>
+                      <label className={`${labelBase} block mb-1`}>City</label>
+                      <Input
+                        value={form.city}
+                        onChange={(e) => setForm({ ...form, city: e.target.value })}
+                        className={inputBase}
+                        placeholder="e.g. New York, Boston"
                       />
                     </div>
                   </div>
@@ -571,7 +657,7 @@ const Companies = () => {
               <SelectValue placeholder="Track" />
             </SelectTrigger>
             <SelectContent>
-              {trackOptions.map((opt) => (
+              {trackFilterOptions.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value} className="text-[11px] text-[#111827] font-sans">
                   {opt.label}
                 </SelectItem>
@@ -605,6 +691,42 @@ const Companies = () => {
         {/* Rows */}
         {filtered.map((c, i) => {
           const isExpanded = expandedIdx === i;
+          const companyContacts = contacts.filter((cc) => cc.company === c.name);
+          const staticTimelineItems = (c.detail?.timelineItems ?? []).filter(
+            (item) => !/^(Coffee Chat|Conversation) — /.test(item.title) && item.title !== "Added to tracker"
+          );
+          const contactTimelineItems = companyContacts.map((contact) => ({
+            title: `Coffee Chat — ${contact.name}`,
+            sub: contact.detail?.metAt
+              ? `${contact.lastTouch} · ${contact.detail.metAt}`
+              : contact.lastTouch,
+            filled: true,
+            note: undefined,
+          }));
+          const sortKeyFromSub = (sub: string) => {
+            const dateStr = sub.split(" · ")[0]?.trim() ?? "";
+            try {
+              const d = parse(`${dateStr} ${new Date().getFullYear()}`, "MMM d yyyy", new Date());
+              return isNaN(d.getTime()) ? 999999999999 : d.getTime();
+            } catch {
+              return 999999999999;
+            }
+          };
+          const mergedTimeline = [...staticTimelineItems, ...contactTimelineItems]
+            .sort((a, b) => sortKeyFromSub(b.sub) - sortKeyFromSub(a.sub))
+            .map((item, idx, arr) => ({ ...item, last: idx === arr.length - 1 }));
+          const followUpToTag = (f: { label: string; type: "done" | "overdue" | "pending" }) =>
+            f.type === "done"
+              ? { label: "Sent" as const, variant: "green" as const }
+              : f.type === "overdue"
+                ? { label: "Overdue" as const, variant: "amber" as const }
+                : { label: f.label, variant: "amber" as const };
+          const mergedKeyContacts = companyContacts.map((contact) => ({
+            name: contact.name,
+            role: contact.role,
+            tag: followUpToTag(contact.followUp),
+            note: contact.detail?.metAt ?? contact.detail?.notes,
+          }));
           return (
             <div
               key={c.id}
@@ -622,7 +744,7 @@ const Companies = () => {
               >
                 <div className="text-[11px] font-medium text-rt-gray-700">{c.name}</div>
                 <div>
-                  <Tag variant={c.track}>{c.trackLabel}</Tag>
+                  <Tag variant={getVariantForTrackLabel(c.trackLabel)}>{c.trackLabel}</Tag>
                 </div>
                 <div>
                   <Tag variant={c.stage.variant}>{c.stage.label}</Tag>
@@ -633,7 +755,9 @@ const Companies = () => {
                 </div>
                 <div className="text-[10px] text-rt-gray-400 font-mono">{c.lastActivity}</div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-rt-gray-500">{c.contacts}</span>
+                  <span className="text-[10px] text-rt-gray-500">
+                    {companyContacts.length} contact{companyContacts.length !== 1 ? "s" : ""}
+                  </span>
                   {isExpanded ? (
                     <ChevronUp className="w-3 h-3 text-rt-blue flex-shrink-0" />
                   ) : (
@@ -645,14 +769,22 @@ const Companies = () => {
               {/* Expanded detail */}
               {isExpanded && (
                 <div className="p-3 bg-[#EFF6FF] flex flex-col gap-2.5" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => handleViewFullProfile(e, c.id)}
+                      className="h-[26px] px-2.5 rounded-lg bg-[#2563EB] flex items-center"
+                    >
+                      <span className="text-[10px] font-medium font-mono text-white">View Full Profile →</span>
+                    </button>
+                  </div>
                   <div className="grid grid-cols-[1.2fr_1fr_1fr] gap-2.5">
                     {/* Left: Interaction Timeline */}
                     <div className="bg-card border border-[#E5E7EB] rounded-lg p-3.5">
                       <div className="text-[10px] font-semibold font-mono uppercase tracking-wider text-rt-gray-500 mb-2.5">
                         Interaction Timeline
                       </div>
-                      {c.detail?.timelineItems ? (
-                        c.detail.timelineItems.map((item, j) => (
+                      {mergedTimeline.length > 0 ? (
+                        mergedTimeline.map((item, j) => (
                           <div key={j} className="flex gap-2.5 pb-3">
                             <div className="flex flex-col items-center">
                               <div
@@ -683,11 +815,11 @@ const Companies = () => {
                       <div className="text-[10px] font-semibold font-mono uppercase tracking-wider text-rt-gray-500 mb-2.5">
                         Key Contacts
                       </div>
-                      {c.detail?.contacts ? (
-                        c.detail.contacts.map((contact, j) => (
+                      {mergedKeyContacts.length > 0 ? (
+                        mergedKeyContacts.map((contact, j) => (
                           <div
                             key={j}
-                            className={j < (c.detail?.contacts?.length ?? 0) - 1 ? "py-1.5 border-b border-rt-gray-100" : "py-1.5"}
+                            className={j < mergedKeyContacts.length - 1 ? "py-1.5 border-b border-rt-gray-100" : "py-1.5"}
                           >
                             <div className="flex items-center gap-2">
                               <div
@@ -746,32 +878,54 @@ const Companies = () => {
                           <div className="text-[10px] text-rt-gray-400 py-2">No role details</div>
                         )}
                       </div>
-                      <div className="bg-card border border-[#E5E7EB] rounded-lg p-3.5 flex-1">
-                        <div className="text-[10px] font-semibold font-mono uppercase tracking-wider text-rt-gray-500 mb-2.5">
-                          Quick Notes
+                      <div className="bg-card border border-[#E5E7EB] rounded-lg p-3.5 flex-1 flex flex-col">
+                        <div className="flex items-center justify-between mb-2.5">
+                          <div className="text-[10px] font-semibold font-mono uppercase tracking-wider text-rt-gray-500">
+                            Quick Notes
+                          </div>
                         </div>
-                        <textarea
-                          value={quickNotesByCompany[c.id] ?? ""}
-                          onChange={(e) => setQuickNotesByCompany({ ...quickNotesByCompany, [c.id]: e.target.value })}
-                          placeholder="Add notes..."
-                          className="w-full h-[70px] bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg p-2 text-[10px] text-rt-gray-700 resize-none focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
-                          onClick={(e) => e.stopPropagation()}
-                        />
+                        {editingQuickNotesCompanyId === c.id ? (
+                          <textarea
+                            ref={quickNotesTextareaRef}
+                            value={quickNotesByCompany[c.id] ?? ""}
+                            onChange={(e) => setQuickNotesByCompany({ ...quickNotesByCompany, [c.id]: e.target.value })}
+                            onBlur={() => setEditingQuickNotesCompanyId(null)}
+                            placeholder="Add notes..."
+                            className="w-full h-[70px] bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg p-2 text-[10px] text-rt-gray-700 resize-none focus:outline-none focus:ring-1 focus:ring-[#2563EB]"
+                            onClick={(e) => e.stopPropagation()}
+                            autoFocus
+                          />
+                        ) : (
+                          <div
+                            className="w-full min-h-[70px] bg-[#F9FAFB] border border-[#E5E7EB] rounded-lg p-2 text-[10px] text-rt-gray-700"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {(quickNotesByCompany[c.id] ?? "").trim() ? (
+                              <span className="text-rt-gray-700 whitespace-pre-wrap">
+                                {quickNotesByCompany[c.id]}
+                              </span>
+                            ) : (
+                              <span className="text-rt-gray-400">Add notes...</span>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex justify-end mt-1.5">
+                          <button
+                            type="button"
+                            aria-label="Edit quick notes"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditingQuickNotesCompanyId(c.id);
+                              setTimeout(() => quickNotesTextareaRef.current?.focus(), 0);
+                            }}
+                            className="p-1 rounded hover:bg-rt-gray-100 text-rt-gray-500 hover:text-rt-gray-700"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
-
-                  {/* Action buttons - McKinsey only */}
-                  {c.id === "mckinsey" && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(e) => handleViewFullProfile(e, c.id)}
-                        className="h-[26px] px-2.5 rounded-lg bg-[#2563EB] flex items-center"
-                      >
-                        <span className="text-[10px] font-medium font-mono text-white">View Full Profile →</span>
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

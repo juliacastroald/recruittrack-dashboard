@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 
 const COMPANIES = [
   "McKinsey & Company",
@@ -108,9 +108,11 @@ interface AddContactModalProps {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: NewContactData) => void;
+  /** When provided, modal is in edit mode and form is pre-filled */
+  initialData?: NewContactData;
 }
 
-const AddContactModal = ({ open, onClose, onSubmit }: AddContactModalProps) => {
+const AddContactModal = ({ open, onClose, onSubmit, initialData }: AddContactModalProps) => {
   const [form, setForm] = useState(emptyForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -118,6 +120,51 @@ const AddContactModal = ({ open, onClose, onSubmit }: AddContactModalProps) => {
     setForm(emptyForm);
     setErrors({});
   };
+
+  const contactToForm = (data: NewContactData) => {
+    const [firstName, ...lastParts] = (data.name || "").trim().split(" ");
+    const lastName = lastParts.join(" ") || "";
+    const companyInList = COMPANIES.includes(data.company);
+    let followUpStatus = "None";
+    if (data.followUp.type === "done") followUpStatus = "Sent";
+    else if (data.followUp.type === "overdue") followUpStatus = "Overdue";
+    else if (data.followUp.label?.includes("Due Today")) followUpStatus = "Due Today";
+    else if (data.followUp.type === "pending") followUpStatus = "Scheduled";
+    let lastTouchDate = "";
+    try {
+      const withYear = `${data.lastTouch} ${new Date().getFullYear()}`;
+      const d = parse(withYear, "MMM d yyyy", new Date());
+      if (!isNaN(d.getTime())) lastTouchDate = format(d, "yyyy-MM-dd");
+    } catch {
+      // leave empty if parse fails
+    }
+    return {
+      firstName: firstName || "",
+      lastName,
+      role: data.role === "—" ? "" : data.role,
+      company: companyInList ? data.company : "Other (type below)",
+      companyOther: companyInList ? "" : data.company,
+      email: data.detail?.email === "—" ? "" : (data.detail?.email ?? ""),
+      linkedin: data.detail?.linkedin === "—" ? "" : (data.detail?.linkedin ?? ""),
+      track: data.trackLabel || "",
+      howWeMet: HOW_WE_MET.includes(data.detail?.metAt ?? "") ? (data.detail?.metAt ?? "") : "Other",
+      howWeMetOther: HOW_WE_MET.includes(data.detail?.metAt ?? "") ? "" : (data.detail?.metAt ?? ""),
+      warmth: data.status?.label ?? "",
+      referral: "",
+      lastTouchDate,
+      followUpDate: "",
+      followUpStatus,
+      notes: data.detail?.notes === "—" ? "" : (data.detail?.notes ?? ""),
+    };
+  };
+
+  useEffect(() => {
+    if (open && initialData) {
+      setForm(contactToForm(initialData));
+    } else if (open && !initialData) {
+      setForm(emptyForm);
+    }
+  }, [open, initialData]);
 
   const handleClose = () => {
     resetForm();
@@ -187,7 +234,7 @@ const AddContactModal = ({ open, onClose, onSubmit }: AddContactModalProps) => {
 
     onSubmit(data);
     handleClose();
-    toast.success("Contact added successfully!");
+    toast.success(initialData ? "Contact updated successfully!" : "Contact added successfully!");
   };
 
   if (!open) return null;
@@ -203,7 +250,7 @@ const AddContactModal = ({ open, onClose, onSubmit }: AddContactModalProps) => {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
-          <h2 className="text-[16px] font-bold text-[#111827]">Add New Contact</h2>
+          <h2 className="text-[16px] font-bold text-[#111827]">{initialData ? "Edit Contact" : "Add New Contact"}</h2>
           <button
             onClick={handleClose}
             className="p-1 rounded hover:bg-rt-gray-100 text-rt-gray-500 hover:text-rt-gray-700"
@@ -510,7 +557,7 @@ const AddContactModal = ({ open, onClose, onSubmit }: AddContactModalProps) => {
               type="submit"
               className="h-9 px-4 rounded-lg bg-[#2563EB] text-white text-[12px] font-medium"
             >
-              Add Contact
+              {initialData ? "Save Changes" : "Add Contact"}
             </button>
           </div>
         </form>

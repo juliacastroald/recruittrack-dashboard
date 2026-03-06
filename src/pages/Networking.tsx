@@ -4,118 +4,12 @@ import Tag from "@/components/Tag";
 import FollowUpEmailModal from "@/components/FollowUpEmailModal";
 import AddContactModal from "@/components/AddContactModal";
 import type { NewContactData } from "@/components/AddContactModal";
+import { useContacts } from "@/contexts/ContactsContext";
 import { FOLLOW_UP_EMAIL_CONTACTS } from "@/data/followUpEmailContacts";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-
-interface Contact {
-  name: string;
-  role: string;
-  company: string;
-  track: "blue" | "purple" | "gray";
-  trackLabel: string;
-  lastTouch: string;
-  followUp: { label: string; type: "done" | "overdue" | "pending" };
-  status: { label: string; variant: "green" | "amber" | "red" | "gray" };
-  avatarColor: string;
-  opacity?: number;
-  detail?: {
-    email: string;
-    linkedin: string;
-    metAt: string;
-    notes: string;
-    suggestedAction: string;
-  };
-}
-
-const initialContacts: Contact[] = [
-  {
-    name: "Sarah Kim", role: "Senior Associate", company: "McKinsey & Company",
-    track: "blue", trackLabel: "Consulting", lastTouch: "Feb 22",
-    followUp: { label: "⚠ Overdue", type: "overdue" },
-    status: { label: "Warm", variant: "amber" }, avatarColor: "bg-rt-blue-light",
-    detail: {
-      email: "skim@mckinsey.com", linkedin: "linkedin.com/in/sarahkim",
-      metAt: "Met at Sloan Trek · Feb 10",
-      notes: "Really helpful conversation about the BA role. Said to follow up after submitting application.",
-      suggestedAction: "Send thank-you — 7 days since last chat",
-    },
-  },
-  {
-    name: "Tom Walsh", role: "Recruiting Coordinator", company: "McKinsey & Company",
-    track: "blue", trackLabel: "Consulting", lastTouch: "Feb 15",
-    followUp: { label: "Due Mar 3", type: "pending" },
-    status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-gray-200",
-    detail: {
-      email: "twalsh@mckinsey.com", linkedin: "linkedin.com/in/tomwalsh",
-      metAt: "Direct outreach",
-      notes: "Confirmed application was received. Mentioned decisions go out mid-March.",
-      suggestedAction: "Follow up approaching — due Mar 3",
-    },
-  },
-  {
-    name: "James Liu", role: "Product Manager", company: "Stripe",
-    track: "purple", trackLabel: "Tech/PM", lastTouch: "Feb 28",
-    followUp: { label: "✓ Sent", type: "done" },
-    status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-green-light",
-    detail: {
-      email: "j.liu@stripe.com", linkedin: "linkedin.com/in/jamesliu",
-      metAt: "Met at tech mixer · Feb 15",
-      notes: "Met at a tech mixer. Very open to referrals. Suggested reaching out to the recruiting team directly after connecting on LinkedIn.",
-      suggestedAction: "No action needed — follow-up already sent",
-    },
-  },
-  {
-    name: "Priya Nair", role: "Senior Associate", company: "Bain & Company",
-    track: "blue", trackLabel: "Consulting", lastTouch: "Feb 20",
-    followUp: { label: "Due Mar 3", type: "pending" },
-    status: { label: "Warm", variant: "amber" }, avatarColor: "bg-rt-amber-light",
-    detail: {
-      email: "p.nair@bain.com", linkedin: "linkedin.com/in/priyanair",
-      metAt: "Sloan networking event · Feb 18",
-      notes: "Great conversation at the Sloan networking event. Mentioned Bain is looking for strong generalists. Said to apply early.",
-      suggestedAction: "Send follow-up before Mar 3 deadline",
-    },
-  },
-  {
-    name: "Michael Torres", role: "Partner", company: "Sequoia Capital",
-    track: "gray", trackLabel: "VC/PE", lastTouch: "Feb 15",
-    followUp: { label: "⚠ Overdue", type: "overdue" },
-    status: { label: "Cold", variant: "red" }, avatarColor: "bg-rt-gray-200",
-    detail: {
-      email: "m.torres@sequoiacap.com", linkedin: "linkedin.com/in/michaeltorres",
-      metAt: "Cold outreach via LinkedIn · Feb 5",
-      notes: "Cold outreach via LinkedIn. Responded quickly. Interested in candidates with operational experience.",
-      suggestedAction: "Re-engage — 14 days since last contact",
-    },
-  },
-  {
-    name: "Anna Chen", role: "Recruiter", company: "Google",
-    track: "purple", trackLabel: "Tech/PM", lastTouch: "Mar 1",
-    followUp: { label: "✓ Sent", type: "done" },
-    status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-blue-light",
-    detail: {
-      email: "a.chen@google.com", linkedin: "linkedin.com/in/annachen",
-      metAt: "Alumni network · Feb 25",
-      notes: "Reached out via alumni network. Helpful overview of the PM role requirements and interview format.",
-      suggestedAction: "No action needed — follow-up already sent",
-    },
-  },
-  {
-    name: "David Park", role: "Senior Associate", company: "BCG",
-    track: "blue", trackLabel: "Consulting", lastTouch: "Jan 30",
-    followUp: { label: "✓ Sent", type: "done" },
-    status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-gray-200",
-    detail: {
-      email: "d.park@bcg.com", linkedin: "linkedin.com/in/davidpark",
-      metAt: "BCG info session · Jan 20",
-      notes: "Former Sloan alum. Very generous with time. Offered to refer if application looks strong.",
-      suggestedAction: "Consider re-engaging if BCG pipeline opens",
-    },
-  },
-];
 
 const followUpClass = {
   done: "bg-rt-green-light text-rt-green",
@@ -124,16 +18,36 @@ const followUpClass = {
 };
 
 const Networking = () => {
-  const [contacts, setContacts] = useState<Contact[]>(initialContacts);
-  const [expandedIdx, setExpandedIdx] = useState<number | null>(0);
+  const { contacts, setContacts } = useContacts();
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [followUpFilter, setFollowUpFilter] = useState("all");
   const [trackFilter, setTrackFilter] = useState("all");
   const [followUpEmailModalOpen, setFollowUpEmailModalOpen] = useState(false);
   const [selectedContactName, setSelectedContactName] = useState<string | null>(null);
   const [addContactModalOpen, setAddContactModalOpen] = useState(false);
+  const [editingContactIndex, setEditingContactIndex] = useState<number | null>(null);
+  const [deleteConfirmIndex, setDeleteConfirmIndex] = useState<number | null>(null);
 
   const handleAddContact = (data: NewContactData) => {
     setContacts((prev) => [{ ...data }, ...prev]);
+    setExpandedIdx(null);
+  };
+
+  const handleSubmitContact = (data: NewContactData) => {
+    if (editingContactIndex !== null) {
+      setContacts((prev) =>
+        prev.map((ct, i) => (i === editingContactIndex ? data : ct))
+      );
+      setEditingContactIndex(null);
+      setAddContactModalOpen(false);
+    } else {
+      handleAddContact(data);
+    }
+  };
+
+  const handleDeleteContact = (index: number) => {
+    setContacts((prev) => prev.filter((_, i) => i !== index));
+    setDeleteConfirmIndex(null);
     setExpandedIdx(null);
   };
 
@@ -153,8 +67,12 @@ const Networking = () => {
 
       <AddContactModal
         open={addContactModalOpen}
-        onClose={() => setAddContactModalOpen(false)}
-        onSubmit={handleAddContact}
+        onClose={() => {
+          setAddContactModalOpen(false);
+          setEditingContactIndex(null);
+        }}
+        onSubmit={handleSubmitContact}
+        initialData={editingContactIndex !== null ? contacts[editingContactIndex] : undefined}
       />
 
       <TopBar
@@ -198,9 +116,11 @@ const Networking = () => {
         {/* Rows */}
         {filtered.map((c, i) => {
           const isExpanded = expandedIdx === i;
+          const contactIndex = contacts.indexOf(c);
+          const showDeleteConfirm = deleteConfirmIndex === contactIndex;
           return (
             <div
-              key={i}
+              key={contactIndex}
               className={`bg-card rounded-[7px] mb-1.5 border transition-colors cursor-pointer ${
                 isExpanded ? "border-rt-blue" : "border-border"
               }`}
@@ -224,13 +144,57 @@ const Networking = () => {
                     {c.followUp.label}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <Tag variant={c.status.variant}>{c.status.label}</Tag>
                   {isExpanded ? (
                     <ChevronUp className="w-3 h-3 text-rt-blue" />
                   ) : (
                     <ChevronDown className="w-3 h-3 text-rt-gray-400" />
                   )}
+                  <div className="flex flex-col gap-0.5 ml-auto relative">
+                    <button
+                      type="button"
+                      aria-label="Edit contact"
+                      onClick={() => {
+                        setEditingContactIndex(contactIndex);
+                        setAddContactModalOpen(true);
+                      }}
+                      className="p-1 rounded hover:bg-rt-gray-100 text-rt-gray-500 hover:text-rt-gray-700"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        aria-label="Delete contact"
+                        onClick={() => setDeleteConfirmIndex(showDeleteConfirm ? null : contactIndex)}
+                        className="p-1 rounded hover:bg-rt-gray-100 text-rt-gray-500 hover:text-rt-red-dark hover:bg-rt-red-light"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      {showDeleteConfirm && (
+                        <div className="absolute right-0 top-full mt-1 z-10 min-w-[140px] bg-card border border-border rounded-lg shadow-lg p-2">
+                          <p className="text-[11px] font-medium text-rt-gray-700 mb-2">Delete Contact?</p>
+                          <div className="flex gap-1.5 justify-end">
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmIndex(null)}
+                              className="h-7 px-2.5 rounded text-[10px] font-medium bg-rt-gray-100 text-rt-gray-700 hover:bg-rt-gray-200"
+                            >
+                              No
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteContact(contactIndex)}
+                              className="h-7 px-2.5 rounded text-[10px] font-medium bg-rt-red text-white hover:opacity-90"
+                            >
+                              Yes
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 

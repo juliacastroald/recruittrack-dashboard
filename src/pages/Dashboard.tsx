@@ -1,9 +1,63 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { parse, isToday, startOfDay, addDays, isBefore, isAfter, subDays } from "date-fns";
 import TopBar from "@/components/TopBar";
 import StatCard from "@/components/StatCard";
 import Tag from "@/components/Tag";
 import FollowUpEmailModal from "@/components/FollowUpEmailModal";
+import { useCompanies } from "@/contexts/CompaniesContext";
+import { useContacts } from "@/contexts/ContactsContext";
+
+function parseDeadline(deadline: string): Date | null {
+  if (!deadline || deadline === "Rolling") return null;
+  const year = new Date().getFullYear();
+  try {
+    const d = parse(`${deadline} ${year}`, "MMM d yyyy", new Date());
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
+
+function parseInterviewDate(interviewValue: string): Date | null {
+  const match = interviewValue.match(/([A-Za-z]{3}\s+\d+)/);
+  if (!match) return null;
+  const year = new Date().getFullYear();
+  try {
+    const d = parse(`${match[1]} ${year}`, "MMM d yyyy", new Date());
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
+
+/** True if date falls within the next 7 days (today inclusive). */
+function isWithinNext7Days(d: Date): boolean {
+  const today = startOfDay(new Date());
+  const end = addDays(today, 6);
+  const dDay = startOfDay(d);
+  return !isBefore(dDay, today) && !isAfter(dDay, end);
+}
+
+/** True if date is within the last 7 days (today inclusive). */
+function isWithinLast7Days(d: Date): boolean {
+  const today = startOfDay(new Date());
+  const start = subDays(today, 6);
+  const dDay = startOfDay(d);
+  return !isBefore(dDay, start) && !isAfter(dDay, today);
+}
+
+function parseSubDate(sub: string): Date | null {
+  const match = sub.match(/([A-Za-z]{3}\s+\d+)/);
+  if (!match) return null;
+  const year = new Date().getFullYear();
+  try {
+    const d = parse(`${match[1]} ${year}`, "MMM d yyyy", new Date());
+    return isNaN(d.getTime()) ? null : d;
+  } catch {
+    return null;
+  }
+}
 
 const activityItems = [
   { color: "bg-rt-blue", text: "Coffee chat logged — McKinsey", time: "2 hours ago" },
@@ -22,6 +76,106 @@ const followUps = [
 const Dashboard = () => {
   const navigate = useNavigate();
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
+  const { companies } = useCompanies();
+  const { contacts } = useContacts();
+
+  const companiesWithContacts = useMemo(() => {
+    const withContacts = companies.filter((c) => contacts.some((cc) => cc.company === c.name)).length;
+    const withNoContacts = companies.length - withContacts;
+    return { withContacts, withNoContacts };
+  }, [companies, contacts]);
+
+  const dashboardStats = useMemo(() => {
+    const applicationsSubmitted = companies.filter(
+      (c) =>
+        c.stage.label === "Applied" ||
+        c.detail?.timelineItems?.some((t) => t.title === "Application Submitted")
+    ).length;
+    let applicationsInLast7Days = 0;
+    companies.forEach((c) => {
+      c.detail?.timelineItems?.forEach((t) => {
+        if (t.title !== "Application Submitted") return;
+        const d = parseSubDate(t.sub);
+        if (d && isWithinLast7Days(d)) applicationsInLast7Days += 1;
+      });
+    });
+
+    const interviewStageLabels = ["Phone Screen", "1st Round Interview", "2nd Round Interview", "Final Round"];
+    const interviewsCount = companies.filter((c) =>
+      interviewStageLabels.includes(c.stage.label)
+    ).length;
+    const interviewsPending = companies.filter((c) => {
+      if (!interviewStageLabels.includes(c.stage.label)) return false;
+      const interviewEntry = c.detail?.roleDetails?.find((r) => r.label === "Interview");
+      if (!interviewEntry?.value) return false;
+      const d = parseInterviewDate(interviewEntry.value);
+      return d && (isToday(d) || isAfter(startOfDay(d), startOfDay(new Date())));
+    }).length;
+
+    return {
+      applicationsSubmitted,
+      applicationsInLast7Days,
+      interviewsCount,
+      interviewsPending,
+      contactsCount: contacts.length,
+    };
+  }, [companies, contacts]);
+
+  const attentionItems = useMemo(() => {
+    const companyByName = (name: string) => companies.find((c) => c.name === name);
+
+    const overdueList = contacts
+      .filter((c) => c.followUp.type === "overdue")
+      .map((contact) => {
+        const company = companyByName(contact.company);
+        return company
+          ? {
+              companyId: company.id,
+              companyName: company.name,
+              title: `Follow up with ${contact.name}`,
+              sub: `${company.name} · ${contact.detail?.metAt ?? contact.lastTouch}`,
+            }
+          : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+
+    const dueTodayList = companies
+      .filter((c) => {
+        const d = parseDeadline(c.deadline);
+        return d && isToday(d);
+      })
+      .map((c) => ({
+        companyId: c.id,
+        companyName: c.name,
+        title: `${c.name} application closes`,
+        sub: `Final deadline · ${c.deadline}`,
+      }));
+
+    const interviewStageLabels = ["Phone Screen", "1st Round Interview", "2nd Round Interview", "Final Round"];
+    const thisWeekList = companies
+      .filter((c) => {
+        if (!interviewStageLabels.includes(c.stage.label)) return false;
+        const interviewEntry = c.detail?.roleDetails?.find((r) => r.label === "Interview");
+        if (!interviewEntry?.value) return false;
+        const d = parseInterviewDate(interviewEntry.value);
+        return d && isWithinNext7Days(d);
+      })
+      .map((c) => {
+        const interviewEntry = c.detail?.roleDetails?.find((r) => r.label === "Interview");
+        return {
+          companyId: c.id,
+          companyName: c.name,
+          title: `${c.stage.label} — ${c.name}`,
+          sub: interviewEntry?.value ?? c.lastActivity,
+        };
+      });
+
+    return {
+      overdue: overdueList,
+      dueToday: dueTodayList,
+      thisWeek: thisWeekList,
+    };
+  }, [companies, contacts]);
 
   return (
   <>
@@ -31,10 +185,34 @@ const Dashboard = () => {
     <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
       {/* Stats */}
       <div className="grid grid-cols-4 gap-2">
-        <StatCard value="6" label="Companies" />
-        <StatCard value="2" label="Applied" />
-        <StatCard value="1" label="Interviews" delta="1 pending" deltaColor="amber" />
-        <StatCard value="7" label="Contacts" />
+        <StatCard
+          value={String(dashboardStats.applicationsSubmitted)}
+          label="Applications Submitted"
+          subtexts={
+            dashboardStats.applicationsInLast7Days > 0
+              ? [`${dashboardStats.applicationsInLast7Days} in the last 7 days`]
+              : undefined
+          }
+        />
+        <StatCard
+          value={String(companies.length)}
+          label="Companies Applied To"
+          subtexts={[
+            `${companiesWithContacts.withContacts} companies with contacts`,
+            `${companiesWithContacts.withNoContacts} companies with no contacts`,
+          ]}
+        />
+        <StatCard
+          value={String(dashboardStats.interviewsCount)}
+          label="Interviews"
+          delta={
+            dashboardStats.interviewsPending > 0
+              ? `${dashboardStats.interviewsPending} pending`
+              : undefined
+          }
+          deltaColor="amber"
+        />
+        <StatCard value={String(dashboardStats.contactsCount)} label="Contacts" />
       </div>
 
       {/* Needs Attention */}
@@ -44,31 +222,79 @@ const Dashboard = () => {
         </div>
         <div className="grid grid-cols-3 gap-2">
           {/* Overdue */}
-          <div className="bg-card border border-rt-red-light rounded-[7px] p-2.5">
+          <div className="bg-card border border-rt-red-light rounded-[7px] p-2.5 flex flex-col min-h-[100px]">
             <Tag variant="red" className="mb-1.5">Overdue</Tag>
-            <div className="text-[11px] font-medium text-rt-gray-700">Follow up with Sarah Kim</div>
-            <div className="text-[10px] text-rt-gray-400 mt-0.5">McKinsey · Coffee chat Feb 22</div>
-            <button onClick={() => setFollowUpModalOpen(true)} className="mt-2 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center">
-              <span className="text-[9px] font-mono text-primary-foreground">Send follow-up →</span>
-            </button>
+            {attentionItems.overdue.length === 0 ? (
+              <>
+                <div className="text-[11px] font-medium text-rt-gray-700">No overdue follow-ups</div>
+                <div className="text-[10px] text-rt-gray-400 mt-0.5">All caught up</div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto max-h-[180px]">
+                {attentionItems.overdue.map((item, i) => (
+                  <div key={i}>
+                    <div className="text-[11px] font-medium text-rt-gray-700">{item.title}</div>
+                    <div className="text-[10px] text-rt-gray-400 mt-0.5">{item.sub}</div>
+                    <button
+                      onClick={() => navigate(`/company/${item.companyId}`)}
+                      className="mt-1.5 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center"
+                    >
+                      <span className="text-[9px] font-mono text-primary-foreground">View company →</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {/* Due Today */}
-          <div className="bg-card border border-rt-amber-light rounded-[7px] p-2.5">
+          <div className="bg-card border border-rt-amber-light rounded-[7px] p-2.5 flex flex-col min-h-[100px]">
             <Tag variant="amber" className="mb-1.5">Due Today</Tag>
-            <div className="text-[11px] font-medium text-rt-gray-700">McKinsey application closes</div>
-            <div className="text-[10px] text-rt-gray-400 mt-0.5">Final deadline · Mar 1</div>
-            <button onClick={() => navigate("/company/mckinsey")} className="mt-2 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center">
-              <span className="text-[9px] font-mono text-primary-foreground">View company →</span>
-            </button>
+            {attentionItems.dueToday.length === 0 ? (
+              <>
+                <div className="text-[11px] font-medium text-rt-gray-700">No deadlines today</div>
+                <div className="text-[10px] text-rt-gray-400 mt-0.5">Next deadline when set</div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto max-h-[180px]">
+                {attentionItems.dueToday.map((item, i) => (
+                  <div key={i}>
+                    <div className="text-[11px] font-medium text-rt-gray-700">{item.title}</div>
+                    <div className="text-[10px] text-rt-gray-400 mt-0.5">{item.sub}</div>
+                    <button
+                      onClick={() => navigate(`/company/${item.companyId}`)}
+                      className="mt-1.5 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center"
+                    >
+                      <span className="text-[9px] font-mono text-primary-foreground">View company →</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           {/* This Week */}
-          <div className="bg-card border border-border rounded-[7px] p-2.5">
+          <div className="bg-card border border-border rounded-[7px] p-2.5 flex flex-col min-h-[100px]">
             <Tag variant="blue" className="mb-1.5">This Week</Tag>
-            <div className="text-[11px] font-medium text-rt-gray-700">1st Round Interview — McKinsey</div>
-            <div className="text-[10px] text-rt-gray-400 mt-0.5">Mar 8 · 2:00 PM</div>
-            <button onClick={() => navigate("/company/mckinsey", { state: { tab: "Notes" } })} className="mt-2 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center">
-              <span className="text-[9px] font-mono text-primary-foreground">View prep notes →</span>
-            </button>
+            {attentionItems.thisWeek.length === 0 ? (
+              <>
+                <div className="text-[11px] font-medium text-rt-gray-700">No interviews this week</div>
+                <div className="text-[10px] text-rt-gray-400 mt-0.5">Upcoming when scheduled</div>
+              </>
+            ) : (
+              <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-y-auto max-h-[180px]">
+                {attentionItems.thisWeek.map((item, i) => (
+                  <div key={i}>
+                    <div className="text-[11px] font-medium text-rt-gray-700">{item.title}</div>
+                    <div className="text-[10px] text-rt-gray-400 mt-0.5">{item.sub}</div>
+                    <button
+                      onClick={() => navigate(`/company/${item.companyId}`, { state: { tab: "Notes" } })}
+                      className="mt-1.5 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center"
+                    >
+                      <span className="text-[9px] font-mono text-primary-foreground">View prep notes →</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
