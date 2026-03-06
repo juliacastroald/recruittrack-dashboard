@@ -4,7 +4,7 @@ import { LayoutDashboard, Users, Building2, BarChart3 } from "lucide-react";
 const navItems = [
   { icon: LayoutDashboard, path: "/", label: "Dashboard" },
   { icon: Users, path: "/networking", label: "Networking" },
-  { icon: Building2, path: "/company/mckinsey", label: "Companies" },
+  { icon: Building2, path: "/companies", label: "Companies" },
   { icon: BarChart3, path: "/analytics", label: "Analytics" },
 ];
 
@@ -14,6 +14,7 @@ const AppSidebar = () => {
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
+    if (path === "/companies") return location.pathname === "/companies" || location.pathname.startsWith("/company/");
     return location.pathname.startsWith(path);
   };
 

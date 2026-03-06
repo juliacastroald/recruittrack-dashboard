@@ -1,4 +1,3 @@
-import { useState } from "react";
 import TopBar from "@/components/TopBar";
 import StatCard from "@/components/StatCard";
 
@@ -20,33 +19,14 @@ const weeklyBars = [
 ];
 
 const tracks = [
-  { label: "Consulting", color: "bg-rt-blue", stats: "8 co. · 3 interviews · 1 offer" },
-  { label: "Tech / PM", color: "bg-rt-purple", stats: "10 co. · 2 interviews · 1 offer" },
-  { label: "VC / PE", color: "bg-rt-green", stats: "6 co. · 1 interview · 0 offers" },
+  { label: "Consulting", color: "bg-rt-blue", stats: "3 co. · 1 interview · 0 offers" },
+  { label: "Tech/PM", color: "bg-rt-purple", stats: "2 co. · 0 interviews · 0 offers" },
+  { label: "VC/PE", color: "bg-rt-green", stats: "1 co. · 0 interviews · 0 offers" },
 ];
 
-const filterOptions = ["Last 30 days", "All Tracks"];
-
-const Analytics = () => {
-  const [activeFilter, setActiveFilter] = useState("All Tracks");
-
-  return (
-    <>
-      <TopBar title="Analytics">
-        <div className="flex gap-1.5 items-center">
-          {filterOptions.map((f) => (
-            <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
-              className={`h-6 px-2.5 rounded-md text-[9px] font-medium font-mono transition-colors ${
-                activeFilter === f ? "bg-rt-blue-light text-rt-blue" : "bg-rt-gray-100 text-rt-gray-500"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-      </TopBar>
+const Analytics = () => (
+  <>
+    <TopBar title="Analytics" />
       <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
         {/* Stats */}
         <div className="grid grid-cols-4 gap-2">
@@ -138,7 +118,6 @@ const Analytics = () => {
         </div>
       </div>
     </>
-  );
-};
+);
 
 export default Analytics;

@@ -1,7 +1,9 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import TopBar from "@/components/TopBar";
 import StatCard from "@/components/StatCard";
 import Tag from "@/components/Tag";
-import { toast } from "sonner";
+import FollowUpEmailModal from "@/components/FollowUpEmailModal";
 
 const activityItems = [
   { color: "bg-rt-blue", text: "Coffee chat logged — McKinsey", time: "2 hours ago" },
@@ -12,21 +14,27 @@ const activityItems = [
 ];
 
 const followUps = [
-  { name: "Sarah Kim", company: "McKinsey", note: "Coffee chat Feb 22", tag: "7d overdue", variant: "red" as const, avatarColor: "bg-rt-blue-light" },
-  { name: "Michael Torres", company: "Sequoia", note: "No reply Feb 15", tag: "14d overdue", variant: "red" as const, avatarColor: "bg-rt-gray-200" },
-  { name: "Priya Nair", company: "Bain", note: "Promised to reconnect", tag: "Due today", variant: "amber" as const, avatarColor: "bg-rt-amber-light" },
+  { name: "Sarah Kim", company: "McKinsey & Company", note: "Coffee chat Feb 22", tag: "7d overdue", variant: "red" as const, avatarColor: "bg-rt-blue-light" },
+  { name: "Michael Torres", company: "Sequoia Capital", note: "No reply Feb 15", tag: "14d overdue", variant: "red" as const, avatarColor: "bg-rt-gray-200" },
+  { name: "Priya Nair", company: "Bain & Company", note: "Promised to reconnect", tag: "Due Mar 3", variant: "amber" as const, avatarColor: "bg-rt-amber-light" },
 ];
 
-const Dashboard = () => (
+const Dashboard = () => {
+  const navigate = useNavigate();
+  const [followUpModalOpen, setFollowUpModalOpen] = useState(false);
+
+  return (
   <>
-    <TopBar title="Dashboard" actionLabel="+ Add Application" showSearch />
+    <FollowUpEmailModal open={followUpModalOpen} onClose={() => setFollowUpModalOpen(false)} />
+
+    <TopBar title="Dashboard" />
     <div className="flex-1 overflow-auto p-4 flex flex-col gap-3">
       {/* Stats */}
       <div className="grid grid-cols-4 gap-2">
-        <StatCard value="24" label="Companies" delta="↑ 3 this week" />
-        <StatCard value="11" label="Applied" />
-        <StatCard value="6" label="Interviews" delta="2 pending" deltaColor="amber" />
-        <StatCard value="38" label="Contacts" />
+        <StatCard value="6" label="Companies" />
+        <StatCard value="2" label="Applied" />
+        <StatCard value="1" label="Interviews" delta="1 pending" deltaColor="amber" />
+        <StatCard value="7" label="Contacts" />
       </div>
 
       {/* Needs Attention */}
@@ -40,26 +48,26 @@ const Dashboard = () => (
             <Tag variant="red" className="mb-1.5">Overdue</Tag>
             <div className="text-[11px] font-medium text-rt-gray-700">Follow up with Sarah Kim</div>
             <div className="text-[10px] text-rt-gray-400 mt-0.5">McKinsey · Coffee chat Feb 22</div>
-            <button onClick={() => toast("Follow-up action")} className="mt-2 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center">
+            <button onClick={() => setFollowUpModalOpen(true)} className="mt-2 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center">
               <span className="text-[9px] font-mono text-primary-foreground">Send follow-up →</span>
             </button>
           </div>
           {/* Due Today */}
           <div className="bg-card border border-rt-amber-light rounded-[7px] p-2.5">
             <Tag variant="amber" className="mb-1.5">Due Today</Tag>
-            <div className="text-[11px] font-medium text-rt-gray-700">Bain application closes</div>
+            <div className="text-[11px] font-medium text-rt-gray-700">McKinsey application closes</div>
             <div className="text-[10px] text-rt-gray-400 mt-0.5">Final deadline · Mar 1</div>
-            <button onClick={() => toast("View company")} className="mt-2 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center">
+            <button onClick={() => navigate("/company/mckinsey")} className="mt-2 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center">
               <span className="text-[9px] font-mono text-primary-foreground">View company →</span>
             </button>
           </div>
           {/* This Week */}
           <div className="bg-card border border-border rounded-[7px] p-2.5">
             <Tag variant="blue" className="mb-1.5">This Week</Tag>
-            <div className="text-[11px] font-medium text-rt-gray-700">1st Round Interview — BCG</div>
-            <div className="text-[10px] text-rt-gray-400 mt-0.5">Mar 3 · 2:00 PM</div>
-            <button onClick={() => toast("View prep notes")} className="mt-2 w-full h-5 bg-rt-gray-100 rounded-[5px] flex items-center justify-center">
-              <span className="text-[9px] font-mono text-rt-gray-500">View prep notes →</span>
+            <div className="text-[11px] font-medium text-rt-gray-700">1st Round Interview — McKinsey</div>
+            <div className="text-[10px] text-rt-gray-400 mt-0.5">Mar 8 · 2:00 PM</div>
+            <button onClick={() => navigate("/company/mckinsey", { state: { tab: "Notes" } })} className="mt-2 w-full h-5 bg-rt-blue rounded-[5px] flex items-center justify-center">
+              <span className="text-[9px] font-mono text-primary-foreground">View prep notes →</span>
             </button>
           </div>
         </div>
@@ -126,6 +134,7 @@ const Dashboard = () => (
       </div>
     </div>
   </>
-);
+  );
+};
 
 export default Dashboard;

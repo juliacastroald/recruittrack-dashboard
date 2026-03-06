@@ -1,8 +1,11 @@
 import { useState } from "react";
 import TopBar from "@/components/TopBar";
 import Tag from "@/components/Tag";
+import FollowUpEmailModal from "@/components/FollowUpEmailModal";
+import AddContactModal from "@/components/AddContactModal";
+import type { NewContactData } from "@/components/AddContactModal";
+import { FOLLOW_UP_EMAIL_CONTACTS } from "@/data/followUpEmailContacts";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { toast } from "sonner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -27,76 +30,88 @@ interface Contact {
   };
 }
 
-const contacts: Contact[] = [
+const initialContacts: Contact[] = [
   {
-    name: "Sarah Kim", role: "Senior Associate", company: "McKinsey",
+    name: "Sarah Kim", role: "Senior Associate", company: "McKinsey & Company",
     track: "blue", trackLabel: "Consulting", lastTouch: "Feb 22",
     followUp: { label: "⚠ Overdue", type: "overdue" },
     status: { label: "Warm", variant: "amber" }, avatarColor: "bg-rt-blue-light",
     detail: {
-      email: "s.kim@mckinsey.com", linkedin: "linkedin.com/in/sarahkim",
+      email: "skim@mckinsey.com", linkedin: "linkedin.com/in/sarahkim",
       metAt: "Met at Sloan Trek · Feb 10",
-      notes: '"Emphasized fit + why consulting. Said to reach out after apps close. Very helpful."',
+      notes: "Really helpful conversation about the BA role. Said to follow up after submitting application.",
       suggestedAction: "Send thank-you — 7 days since last chat",
     },
   },
   {
-    name: "James Liu", role: "PM, Growth", company: "Stripe",
-    track: "purple", trackLabel: "Tech", lastTouch: "Feb 28",
+    name: "Tom Walsh", role: "Recruiting Coordinator", company: "McKinsey & Company",
+    track: "blue", trackLabel: "Consulting", lastTouch: "Feb 15",
+    followUp: { label: "Due Mar 3", type: "pending" },
+    status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-gray-200",
+    detail: {
+      email: "twalsh@mckinsey.com", linkedin: "linkedin.com/in/tomwalsh",
+      metAt: "Direct outreach",
+      notes: "Confirmed application was received. Mentioned decisions go out mid-March.",
+      suggestedAction: "Follow up approaching — due Mar 3",
+    },
+  },
+  {
+    name: "James Liu", role: "Product Manager", company: "Stripe",
+    track: "purple", trackLabel: "Tech/PM", lastTouch: "Feb 28",
     followUp: { label: "✓ Sent", type: "done" },
     status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-green-light",
     detail: {
       email: "j.liu@stripe.com", linkedin: "linkedin.com/in/jamesliu",
-      metAt: "Met at MIT FinTech Conference · Feb 15",
-      notes: '"Really interested in growth PM roles. Gave great advice on Stripe culture and interview process."',
+      metAt: "Met at tech mixer · Feb 15",
+      notes: "Met at a tech mixer. Very open to referrals. Suggested reaching out to the recruiting team directly after connecting on LinkedIn.",
       suggestedAction: "No action needed — follow-up already sent",
     },
   },
   {
-    name: "Priya Nair", role: "Associate", company: "Bain & Co.",
+    name: "Priya Nair", role: "Senior Associate", company: "Bain & Company",
     track: "blue", trackLabel: "Consulting", lastTouch: "Feb 20",
-    followUp: { label: "↻ Due Mar 3", type: "pending" },
+    followUp: { label: "Due Mar 3", type: "pending" },
     status: { label: "Warm", variant: "amber" }, avatarColor: "bg-rt-amber-light",
     detail: {
       email: "p.nair@bain.com", linkedin: "linkedin.com/in/priyanair",
-      metAt: "Intro via Sarah Kim · Feb 18",
-      notes: '"Discussed Bain\'s healthcare practice. Offered to review my resume before application deadline."',
+      metAt: "Sloan networking event · Feb 18",
+      notes: "Great conversation at the Sloan networking event. Mentioned Bain is looking for strong generalists. Said to apply early.",
       suggestedAction: "Send follow-up before Mar 3 deadline",
     },
   },
   {
-    name: "Michael Torres", role: "VP Strategy", company: "Sequoia",
+    name: "Michael Torres", role: "Partner", company: "Sequoia Capital",
     track: "gray", trackLabel: "VC/PE", lastTouch: "Feb 15",
     followUp: { label: "⚠ Overdue", type: "overdue" },
     status: { label: "Cold", variant: "red" }, avatarColor: "bg-rt-gray-200",
     detail: {
       email: "m.torres@sequoiacap.com", linkedin: "linkedin.com/in/michaeltorres",
-      metAt: "HBS VC Trek · Feb 5",
-      notes: '"Brief conversation at networking event. Mentioned openness to coffee chats with MBA students."',
+      metAt: "Cold outreach via LinkedIn · Feb 5",
+      notes: "Cold outreach via LinkedIn. Responded quickly. Interested in candidates with operational experience.",
       suggestedAction: "Re-engage — 14 days since last contact",
     },
   },
   {
-    name: "Anna Chen", role: "Associate PM", company: "Google",
-    track: "purple", trackLabel: "Tech", lastTouch: "Mar 1",
+    name: "Anna Chen", role: "Recruiter", company: "Google",
+    track: "purple", trackLabel: "Tech/PM", lastTouch: "Mar 1",
     followUp: { label: "✓ Sent", type: "done" },
     status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-blue-light",
     detail: {
       email: "a.chen@google.com", linkedin: "linkedin.com/in/annachen",
-      metAt: "Google campus visit · Feb 25",
-      notes: '"Shared insights on APM program. Recommended focusing on product sense cases for interviews."',
+      metAt: "Alumni network · Feb 25",
+      notes: "Reached out via alumni network. Helpful overview of the PM role requirements and interview format.",
       suggestedAction: "No action needed — follow-up already sent",
     },
   },
   {
-    name: "David Park", role: "Principal", company: "BCG",
+    name: "David Park", role: "Senior Associate", company: "BCG",
     track: "blue", trackLabel: "Consulting", lastTouch: "Jan 30",
     followUp: { label: "✓ Sent", type: "done" },
-    status: { label: "Inactive", variant: "gray" }, avatarColor: "bg-rt-gray-200", opacity: 0.6,
+    status: { label: "Active", variant: "green" }, avatarColor: "bg-rt-gray-200",
     detail: {
       email: "d.park@bcg.com", linkedin: "linkedin.com/in/davidpark",
       metAt: "BCG info session · Jan 20",
-      notes: '"Provided referral for Sarah Kim at McKinsey. Mentioned BCG is hiring for summer."',
+      notes: "Former Sloan alum. Very generous with time. Offered to refer if application looks strong.",
       suggestedAction: "Consider re-engaging if BCG pipeline opens",
     },
   },
@@ -109,9 +124,18 @@ const followUpClass = {
 };
 
 const Networking = () => {
+  const [contacts, setContacts] = useState<Contact[]>(initialContacts);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(0);
   const [followUpFilter, setFollowUpFilter] = useState("all");
   const [trackFilter, setTrackFilter] = useState("all");
+  const [followUpEmailModalOpen, setFollowUpEmailModalOpen] = useState(false);
+  const [selectedContactName, setSelectedContactName] = useState<string | null>(null);
+  const [addContactModalOpen, setAddContactModalOpen] = useState(false);
+
+  const handleAddContact = (data: NewContactData) => {
+    setContacts((prev) => [{ ...data }, ...prev]);
+    setExpandedIdx(null);
+  };
 
   const filtered = contacts.filter((c) => {
     if (followUpFilter !== "all" && c.followUp.type !== followUpFilter) return false;
@@ -121,7 +145,23 @@ const Networking = () => {
 
   return (
     <>
-      <TopBar title="People" actionLabel="+ Add Contact">
+      <FollowUpEmailModal
+        open={followUpEmailModalOpen}
+        onClose={() => setFollowUpEmailModalOpen(false)}
+        contact={selectedContactName ? FOLLOW_UP_EMAIL_CONTACTS[selectedContactName] : undefined}
+      />
+
+      <AddContactModal
+        open={addContactModalOpen}
+        onClose={() => setAddContactModalOpen(false)}
+        onSubmit={handleAddContact}
+      />
+
+      <TopBar
+        title="People"
+        actionLabel="+ Add Contact"
+        onAction={() => setAddContactModalOpen(true)}
+      >
         <div className="flex gap-1.5 items-center">
           <Select value={followUpFilter} onValueChange={setFollowUpFilter}>
             <SelectTrigger className="h-6 w-[100px] text-[9px] font-mono border-border bg-rt-gray-100 px-2 rounded-md">
@@ -141,7 +181,7 @@ const Networking = () => {
             <SelectContent>
               <SelectItem value="all" className="text-[10px]">All Tracks</SelectItem>
               <SelectItem value="blue" className="text-[10px]">Consulting</SelectItem>
-              <SelectItem value="purple" className="text-[10px]">Tech</SelectItem>
+              <SelectItem value="purple" className="text-[10px]">Tech/PM</SelectItem>
               <SelectItem value="gray" className="text-[10px]">VC/PE</SelectItem>
             </SelectContent>
           </Select>
@@ -215,7 +255,13 @@ const Networking = () => {
                       <div className="text-[10px] text-rt-amber-dark font-medium">{c.detail.suggestedAction}</div>
                     </div>
                     <button
-                      onClick={(e) => { e.stopPropagation(); toast("Drafting follow-up email…"); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (c.detail && FOLLOW_UP_EMAIL_CONTACTS[c.name]) {
+                          setSelectedContactName(c.name);
+                          setFollowUpEmailModalOpen(true);
+                        }
+                      }}
                       className="mt-1 h-[22px] bg-rt-blue rounded-[5px] flex items-center justify-center"
                     >
                       <span className="text-[9px] font-mono text-primary-foreground">Draft follow-up email →</span>
