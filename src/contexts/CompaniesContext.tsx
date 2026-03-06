@@ -10,9 +10,13 @@ function loadCompanies(): Company[] {
     const parsed = JSON.parse(raw) as Company[];
     if (!Array.isArray(parsed) || parsed.length === 0) return initialCompanies;
 
+    const storedIds = new Set(parsed.map((c) => c.id));
+    const missingSeed = initialCompanies.filter((seed) => !storedIds.has(seed.id));
+    const merged = missingSeed.length > 0 ? [...parsed, ...missingSeed] : parsed;
+
     const seedById = new Map(initialCompanies.map((c) => [c.id, c]));
 
-    return parsed.map((c) => {
+    return merged.map((c) => {
       const seed = seedById.get(c.id);
       if (!seed?.detail?.roleDetails?.length) return c;
       const hasRoleDetails = (c.detail?.roleDetails?.length ?? 0) > 0;
